@@ -17,7 +17,8 @@
         输入你的NGA昵称：<input v-model=nga_name id="input_nga_name">
         <br>
         输入你的DOTA2数字ID：<input v-model=steam_id id="input_steam_id">
-        <button v-on:click="getOpendotaStats">click me</button>
+        <br>
+        重新生成需要刷新页面<button v-on:click="getOpendotaStats">click me</button>
         <hr>
         <div v-if="basic">
             <img :src="userdata.profile.avatarfull" />

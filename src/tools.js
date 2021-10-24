@@ -25,7 +25,7 @@ function getRank(rankNum, num) {
     if (num === 0) {
         return rankNum[0];
     } else {
-        if (rankNum[0] === '8') return false;
+        if (rankNum[0] === '8') return 0;
         return rankNum[1];
     }
 }
