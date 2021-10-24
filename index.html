@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+    <meta charset="utf-8">
+    <title>322</title>
+    <script src="./lib/vue.min.js"></script>
+    <script src="./lib/axios.min.js"></script>
+    <script src="./lib/canvas2image.js"></script>
+    <script src="./src/tools.js"></script>
+    <script src="./src/canvas.js"></script>
+</head>
+
+<body>
+    <div id="vue_main">
+        <div id="load_response"></div>
+        输入你的NGA昵称：<input v-model=nga_name id="input_nga_name">
+        <br>
+        输入你的DOTA2数字ID：<input v-model=steam_id id="input_steam_id">
+        <button v-on:click="getOpendotaStats">click me</button>
+        <hr>
+        <div v-if="basic">
+            <img :src="userdata.profile.avatarfull" />
+            <br>
+            ID：{{ userdata.profile.personaname }}
+            <hr>
+            天梯段位：{{ getRankName(userdata.rank_tier) }}
+            <br>
+            <div style="width: 256px; height:256px; background-color: black;">
+                <img style="position: absolute" :src="img_rank" />
+                <img :src="img_star" />
+            </div>
+            <hr>
+            常用英雄：
+            <div id="hero_box">
+                <img :src="hero1" />
+                <img :src="hero2" />
+                <img :src="hero3" />
+            </div>
+            <hr>
+            <div>
+                <div style="position: relative">场次：{{ matches }}</div>
+                <div style="position: relative">KDA：{{ ((kpp + app) / dpp).toFixed(2) }}</div>
+                <div style="position: relative">总胜率：{{ toPercent(winrate) }}</div>
+                <div style="position: relative">天梯胜率：{{ toPercent(rankwinrate) }}</div>
+            </div>
+            <hr>
+            近100局游戏：
+            <br>
+            普通匹配 {{ details.recent.normal }} 天梯匹配 {{ details.recent.rank }} 其他模式 {{ details.recent.others }}
+        </div>
+        <canvas id="mycanvas" width="650" height="120"></canvas>
+        <button v-on:click="saveCanvas">Save</button>
+    </div>
+    </div>
+    <script type="text/javascript">
+
+        let vm = new Vue({
+            el: '#vue_main',
+            data: {
+                steam_id: '',
+                nga_name: '',
+                basic: false,
+                userdata: '',
+                pic1: new Image(),
+                pic2: new Image(),
+                pic3: new Image(),
+                pic4: new Image(),
+                pic5: new Image(),
+                pic_loaded: 0
+            },
+            methods: {
+                imageHasLoaded: function() {
+                    this.pic_loaded++;
+                    console.log(`图片加载中：${this.pic_loaded}/5`);
+                    if (this.pic_loaded >= 5) drawCanvas(this);
+                },
+                getOpendotaStats: function () {
+                    console.log("请求DOTA2数据...");
+                    function readResponses(response, response_heroes, response_matches) {
+                        console.log("加载图片资源...");
+                        this.userdata = response.data;
+                        this.herodata = response_heroes.data;
+                        this.matchdata = response_matches.data;
+
+                        this.img_rank = `./static/img/resize-rank_icon_${getRank(this.userdata.rank_tier, 0)}.png`;
+                        this.img_star = `./static/img/resize-rank_star_${getRank(this.userdata.rank_tier, 1)}.png`;
+                        this.hero1 = `https://steamcdn-a.akamaihd.net/apps/dota2/images/heroes/${hero_id_dict[parseInt(this.herodata[0].hero_id)].name}_full.png`;
+                        this.hero2 = `https://steamcdn-a.akamaihd.net/apps/dota2/images/heroes/${hero_id_dict[parseInt(this.herodata[1].hero_id)].name}_full.png`;
+                        this.hero3 = `https://steamcdn-a.akamaihd.net/apps/dota2/images/heroes/${hero_id_dict[parseInt(this.herodata[2].hero_id)].name}_full.png`;
+                        
+                        this.pic1.onload = this.imageHasLoaded;
+                        this.pic2.onload = this.imageHasLoaded;
+                        this.pic3.onload = this.imageHasLoaded;
+                        this.pic4.onload = this.imageHasLoaded;
+                        this.pic5.onload = this.imageHasLoaded;
+                        this.pic1.src = `./static/img/heroes/resize-${hero_id_dict[parseInt(this.herodata[0].hero_id)].name}_full.png`;
+                        this.pic2.src = `./static/img/heroes/resize-${hero_id_dict[parseInt(this.herodata[1].hero_id)].name}_full.png`;
+                        this.pic3.src = `./static/img/heroes/resize-${hero_id_dict[parseInt(this.herodata[2].hero_id)].name}_full.png`;
+                        this.pic4.src = `./static/img/resize-rank_icon_${getRank(this.userdata.rank_tier, 0)}.png`;
+                        this.pic5.src = `./static/img/resize-rank_star_${getRank(this.userdata.rank_tier, 1)}.png`;
+
+                        this.details = {
+                            win: 0,
+                            lose: 0,
+                            rank: 0,
+                            recent: {
+                                normal: 0,
+                                rank: 0,
+                                others: 0
+                            },
+                            rankwin: 0,
+                            ranklose: 0,
+                            k: 0,
+                            d: 0,
+                            a: 0
+                        }
+                        let recentNum = 0;
+                        for (let i of this.matchdata) {
+                            let isWin = ((i.player_slot <= 127) && i.radiant_win) || ((i.player_slot > 127) && !i.radiant_win);
+                            if (recentNum <= 99) {
+                                if (i.lobby_type === 7) {
+                                    this.details.recent.rank++;
+                                } else if (i.lobby_type === 0) {
+                                    this.details.recent.normal++;
+                                } else {
+                                    this.details.recent.others++
+                                }
+                                recentNum++;
+                            }
+                            if (i.lobby_type === 7) {
+                                this.details.rank += 1;
+                                if (isWin) {
+                                    this.details.rankwin++;
+                                } else {
+                                    this.details.ranklose++;
+                                }
+                            }
+                            if (isWin) {
+                                this.details.win++;
+                            } else {
+                                this.details.lose++;
+                            }
+                            this.details.k += i.kills;
+                            this.details.d += i.deaths;
+                            this.details.a += i.assists;
+                        }
+                        this.matches = this.matchdata.length;
+                        this.winrate = this.details.win / this.matches;
+                        this.rankwinrate = this.details.rankwin / this.details.rank;
+                        this.kpp = this.details.k / this.matches;
+                        this.dpp = this.details.d / this.matches;
+                        this.app = this.details.a / this.matches;
+
+                        this.basic = true;
+                    }
+
+                    readResponses = readResponses.bind(this);
+                    axios
+                        .all([
+                            axios.get(`https://api.opendota.com/api/players/${this.steam_id}`),
+                            axios.get(`https://api.opendota.com/api/players/${this.steam_id}/heroes`),
+                            axios.get(`https://api.opendota.com/api/players/${this.steam_id}/matches`)
+                        ])
+                        .then(axios.spread((res1, res2, res3) => readResponses(res1, res2, res3)))
+                        .catch(function (error) {
+                            console.log(error);
+                        });
+                },
+                getRankName: getRankName,
+                saveCanvas: function () {
+                    Canvas2Image.saveAsPNG(document.getElementById("mycanvas"));
+                }
+            }
+        });
+        let vm1;
+    </script>
+</body>
+<!--
+
+-->
+
+</html>
